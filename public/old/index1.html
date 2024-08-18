@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Status Display</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #f0f0f0;
+    }
+
+    .header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #000;
+      color: #fff;
+      padding: 10px 20px;
+    }
+
+    .header img {
+      height: 50px;
+    }
+
+    .header .time {
+      font-size: 24px;
+    }
+
+    .container {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .column {
+      width: 45%;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .column h2 {
+      background-color: #ddd;
+      padding: 10px;
+      margin: 0;
+      text-align: center;
+    }
+
+    .order-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .order-item:last-child {
+      border-bottom: none;
+    }
+
+    .order-item .order-details {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .order-item .order-id,
+    .order-item .order-time {
+      margin-left: 20px;
+      color: #666;
+    }
+
+    .order-item .order-time {
+      display: flex;
+      align-items: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <img src="logo.png" alt="Gato Rojo Logo">
+    <div class="time" id="current-time"></div>
+  </div>
+  <div class="container">
+    <div class="column">
+      <h2>Getting Ready</h2>
+      <ul class="order-list" id="getting-ready-list"></ul>
+    </div>
+    <div class="column">
+      <h2>Now Ready</h2>
+      <ul class="order-list" id="now-ready-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    function updateTime() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const formattedHours = hours % 12 || 12;
+      const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+      const formattedTime = `${formattedHours}:${formattedMinutes} ${ampm}`;
+      const formattedDate = now.toDateString();
+      document.getElementById('current-time').textContent = `${formattedDate} ${formattedTime}`;
+    }
+
+    function formatTimeDifference(dateString) {
+      const now = new Date();
+      const orderDate = new Date(dateString);
+      const diffMs = now - orderDate;
+      const diffMins = Math.round(diffMs / 6000);
+      return `${diffMins} min`;
+    }
+
+    async function fetchOrders() {
+      const response = await fetch('/orders');
+      const data = await response.json();
+      displayOrders(data.orders);
+    }
+
+    function displayOrders(orders) {
+      const gettingReadyList = document.getElementById('getting-ready-list');
+      const nowReadyList = document.getElementById('now-ready-list');
+
+      gettingReadyList.innerHTML = '';
+      nowReadyList.innerHTML = '';
+
+      orders.forEach(order => {
+        const orderItem = document.createElement('li');
+        orderItem.className = 'order-item';
+        orderItem.innerHTML = `
+          <div class="order-details">
+            <div>Order No ${order.id}</div>
+            <div>${order.customerFirstName} ${order.customerLastName.charAt(0)}.</div>
+            <div>${new Date(order.date).toLocaleDateString()}</div>
+          </div>
+        `;
+
+        let status = 'getting_ready'; // Default status
+
+        if (order.canceledAt) {
+          status = 'canceled';
+        } else if (order.rejectedAt) {
+          status = 'failed';
+        } else if (order.pickupAt) {
+          status = 'completed';
+        } else if (order.readyAt) {
+          status = 'prepared';
+        } else if (order.acceptedAt) {
+          status = 'reserved';
+        }
+
+        if (status === 'getting_ready' || status === 'reserved') {
+          gettingReadyList.appendChild(orderItem);
+        } else if (status === 'completed' || status === 'prepared' || status === 'failed' || status === 'canceled') {
+          nowReadyList.appendChild(orderItem);
+        }
+      });
+    }
+
+    updateTime();
+    setInterval(updateTime, 60000); // Update the time every minute
+
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchOrders();
+      setInterval(fetchOrders, 60000); // Update the order list every minute
+    });
+  </script>
+</body>
+
+</html>
